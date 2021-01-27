@@ -1,114 +1,181 @@
-/**
- * Sample React Native App
- * https://github.com/facebook/react-native
- *
- * @format
- * @flow strict-local
- */
-
+import {StatusBar} from 'expo-status-bar';
 import React from 'react';
 import {
-  SafeAreaView,
   StyleSheet,
-  ScrollView,
+  Image,
   View,
+  Dimensions,
+  FlatList,
+  findNodeHandle,
   Text,
-  StatusBar,
+  Animated,
+  TouchableOpacity,
 } from 'react-native';
 
-import {
-  Header,
-  LearnMoreLinks,
-  Colors,
-  DebugInstructions,
-  ReloadInstructions,
-} from 'react-native/Libraries/NewAppScreen';
+const {width, height} = Dimensions.get('screen');
 
-const App: () => React$Node = () => {
+const images = {
+  man:
+    'https://images.pexels.com/photos/3147528/pexels-photo-3147528.jpeg?auto=compress&cs=tinysrgb&dpr=2&w=500',
+  women:
+    'https://images.pexels.com/photos/2552130/pexels-photo-2552130.jpeg?auto=compress&cs=tinysrgb&dpr=2&w=500',
+  kids:
+    'https://images.pexels.com/photos/5080167/pexels-photo-5080167.jpeg?auto=compress&cs=tinysrgb&dpr=2&w=500',
+  skullcandy:
+    'https://images.pexels.com/photos/5602879/pexels-photo-5602879.jpeg?auto=compress&cs=tinysrgb&dpr=2&w=500',
+  help:
+    'https://images.pexels.com/photos/2552130/pexels-photo-2552130.jpeg?auto=compress&cs=tinysrgb&dpr=2&w=500',
+};
+const data = Object.keys(images).map((i) => ({
+  key: i,
+  title: i,
+  image: images[i],
+  ref: React.createRef(),
+}));
+
+const Tab = React.forwardRef(({item, onItemPress}, ref) => {
   return (
-    <>
-      <StatusBar barStyle="dark-content" />
-      <SafeAreaView>
-        <ScrollView
-          contentInsetAdjustmentBehavior="automatic"
-          style={styles.scrollView}>
-          <Header />
-          {global.HermesInternal == null ? null : (
-            <View style={styles.engine}>
-              <Text style={styles.footer}>Engine: Hermes</Text>
-            </View>
-          )}
-          <View style={styles.body}>
-            <View style={styles.sectionContainer}>
-              <Text style={styles.sectionTitle}>Step One</Text>
-              <Text style={styles.sectionDescription}>
-                Edit <Text style={styles.highlight}>App.js</Text> to change this
-                screen and then come back to see your edits.
-              </Text>
-            </View>
-            <View style={styles.sectionContainer}>
-              <Text style={styles.sectionTitle}>See Your Changes</Text>
-              <Text style={styles.sectionDescription}>
-                <ReloadInstructions />
-              </Text>
-            </View>
-            <View style={styles.sectionContainer}>
-              <Text style={styles.sectionTitle}>Debug</Text>
-              <Text style={styles.sectionDescription}>
-                <DebugInstructions />
-              </Text>
-            </View>
-            <View style={styles.sectionContainer}>
-              <Text style={styles.sectionTitle}>Learn More</Text>
-              <Text style={styles.sectionDescription}>
-                Read the docs to discover what to do next:
-              </Text>
-            </View>
-            <LearnMoreLinks />
-          </View>
-        </ScrollView>
-      </SafeAreaView>
-    </>
+    <TouchableOpacity onPress={onItemPress}>
+      <View ref={ref}>
+        <Text
+          style={{
+            color: 'white',
+            fontSize: 84 / data.length,
+            fontWeight: '800',
+            textTransform: 'uppercase',
+          }}>
+          {item.title}
+        </Text>
+      </View>
+    </TouchableOpacity>
+  );
+});
+
+const Indicator = ({measures, scrollX}) => {
+  const inputRange = data.map((_, i) => i * width);
+  const indicatorWidth = scrollX.interpolate({
+    inputRange,
+    outputRange: measures.map((measure) => measure.width),
+  });
+  const translateX = scrollX.interpolate({
+    inputRange,
+    outputRange: measures.map((measure) => measure.x),
+  });
+  return (
+    <Animated.View
+      style={{
+        position: 'absolute',
+        height: 4,
+        width: indicatorWidth,
+        backgroundColor: 'white',
+        bottom: -10,
+        transform: [
+          {
+            translateX: translateX,
+          },
+        ],
+      }}
+    />
   );
 };
 
+const Tabs = ({data, scrollX, onItemPress}) => {
+  const [measures, setMeasures] = React.useState([]);
+  const containerRef = React.useRef();
+  const ref = React.useRef();
+
+  React.useEffect(() => {
+    let m = [];
+    data.forEach((item) => {
+      item.ref.current.measureLayout(
+        containerRef.current,
+        (x, y, width, height) => {
+          m.push({
+            x,
+            y,
+            width,
+            height,
+          });
+          if (m.length === data.length) {
+            setMeasures(m);
+          }
+        },
+      );
+    });
+  }, []);
+
+  return (
+    <View style={{position: 'absolute', top: 100, width}}>
+      <View
+        ref={containerRef}
+        style={{justifyContent: 'space-evenly', flex: 1, flexDirection: 'row'}}>
+        {data.map((item, index) => (
+          <Tab
+            key={item.key}
+            item={item}
+            ref={item.ref}
+            onItemPress={() => onItemPress(index)}
+          />
+        ))}
+      </View>
+      {measures.length > 0 && (
+        <Indicator measures={measures} scrollX={scrollX} />
+      )}
+    </View>
+  );
+};
+
+export default function App() {
+  const scrollX = React.useRef(new Animated.Value(0)).current;
+  const ref = React.useRef();
+  const onItemPress = React.useCallback((itemIndex) =>
+    ref?.current?.scrollToOffset({
+      offset: itemIndex * width,
+    }),
+  );
+
+  return (
+    <View style={styles.container}>
+      <StatusBar hidden />
+      <Animated.FlatList
+        data={data}
+        horizontal
+        ref={ref}
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        bounces
+        onScroll={Animated.event(
+          [{nativeEvent: {contentOffset: {x: scrollX}}}],
+          {useNativeDriver: false},
+        )}
+        keyExtractor={(item) => item.key}
+        renderItem={({item}) => {
+          return (
+            <View style={{width, height}}>
+              <Image
+                source={{uri: item.image}}
+                style={{flex: 1, resizeMode: 'cover'}}
+              />
+              <View
+                style={[
+                  StyleSheet.absoluteFillObject,
+                  {backgroundColor: 'rgba(0,0,0,0.3)'},
+                ]}
+              />
+            </View>
+          );
+        }}
+      />
+      <Tabs scrollX={scrollX} data={data} onItemPress={onItemPress} />
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  scrollView: {
-    backgroundColor: Colors.lighter,
-  },
-  engine: {
-    position: 'absolute',
-    right: 0,
-  },
-  body: {
-    backgroundColor: Colors.white,
-  },
-  sectionContainer: {
-    marginTop: 32,
-    paddingHorizontal: 24,
-  },
-  sectionTitle: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: Colors.black,
-  },
-  sectionDescription: {
-    marginTop: 8,
-    fontSize: 18,
-    fontWeight: '400',
-    color: Colors.dark,
-  },
-  highlight: {
-    fontWeight: '700',
-  },
-  footer: {
-    color: Colors.dark,
-    fontSize: 12,
-    fontWeight: '600',
-    padding: 4,
-    paddingRight: 12,
-    textAlign: 'right',
+  container: {
+    flex: 1,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
-
-export default App;
